@@ -6,7 +6,7 @@
 
 import UIKit
 
-//MARK: Picker Enumrations
+// MARK: Picker Enumrations
 enum PickerResult {
     case success(String)
     case error(SelectImageError)
@@ -38,7 +38,7 @@ enum SelectImageError: LocalizedError {
     }
 }
 
-//MARK: Class Image_Picker_Button
+// MARK: Class Image_Picker_Button
 class ImagePickerButton: UIButton {
     
     //MARK: Variables
@@ -52,7 +52,7 @@ class ImagePickerButton: UIButton {
     let highResolutionSize = 2048 // can change according to your app.
     
     
-    //MARK: Starting
+    // MARK: Starting
     override func awakeFromNib() {
         self.addTarget(self, action: #selector(ImagePickerButton.pressAction(_:)), for: UIControlEvents.touchUpInside)
     }
@@ -60,7 +60,7 @@ class ImagePickerButton: UIButton {
     deinit {
     }
     
-    //MARK: Customizables results for selecting file name, picker type and titles
+    // MARK: Customizables results for selecting file name, picker type and titles
     @discardableResult
     func customize(type: PickerType, fileName: String = "#fileName") -> ImagePickerButton {
         pickerType = type
@@ -79,7 +79,7 @@ class ImagePickerButton: UIButton {
     }
     
     
-    //MARK: Button Action
+    // MARK: Button Action
     @objc private func pressAction(_ sender: ImagePickerButton) {
         
         guard let pickerType = self.pickerType else {
@@ -88,7 +88,7 @@ class ImagePickerButton: UIButton {
         self.selectImage(fileName: fileName, pickerType: pickerType)
     }
     
-    //MARK: Document Directory Path
+    // MARK: Document Directory Path
     func pathToDocumentsDirectory() -> String {
         
         let documentsPath: AnyObject = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0] as AnyObject
@@ -195,6 +195,23 @@ class ImagePickerButton: UIButton {
         })
         actionSheet.addAction(photoLibraryAction)
     }
+    
+    // MARK: for orientation errors
+     func fixOrientation(image: UIImage) -> UIImage {
+
+        if image.imageOrientation == UIImageOrientation.up {
+            return image
+        }
+
+        UIGraphicsBeginImageContextWithOptions(image.size, false, image.scale)
+        let rect = CGRect(x: 0, y: 0, width: image.size.width, height: image.size.height)
+        image.draw(in: rect)
+        guard let normalizedImage: UIImage = UIGraphicsGetImageFromCurrentImageContext() else  {
+            return UIImage()
+        }
+        UIGraphicsEndImageContext()
+        return normalizedImage
+    }
 }
 
 extension ImagePickerButton: UINavigationControllerDelegate, UIImagePickerControllerDelegate {
@@ -203,12 +220,14 @@ extension ImagePickerButton: UINavigationControllerDelegate, UIImagePickerContro
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [String : Any]) {
         if let pickedImage = info[UIImagePickerControllerOriginalImage] as? UIImage {
             
-            guard let image = UIImageJPEGRepresentation(pickedImage, 1.0) else {
+            let imagePicked = fixOrientation(image: pickedImage)  // ---> Orientation fix from camera
+            
+            guard let image = UIImageJPEGRepresentation(imagePicked, 1.0) else {
                 return
             }
             
             if image.count > highResolutionSize { //high resolution check
-                if let data = UIImageJPEGRepresentation(pickedImage, 0.2) {
+                if let data = UIImageJPEGRepresentation(imagePicked, 0.2) {
                     do {
                         try data.write(to: URL(fileURLWithPath: filePath ?? "no Path"), options: .atomic)
                     } catch {
@@ -216,7 +235,7 @@ extension ImagePickerButton: UINavigationControllerDelegate, UIImagePickerContro
                     }
                 }
             } else {
-                if let data = UIImageJPEGRepresentation(pickedImage, 0.4) {
+                if let data = UIImageJPEGRepresentation(imagePicked, 0.4) {
                     do {
                         try data.write(to: URL(fileURLWithPath: filePath ?? "no Path"), options: .atomic)
                     } catch {

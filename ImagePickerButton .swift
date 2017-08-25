@@ -195,6 +195,23 @@ class ImagePickerButton: UIButton {
         })
         actionSheet.addAction(photoLibraryAction)
     }
+    
+    func fixOrientation(image: UIImage) -> UIImage {
+        
+        if image.imageOrientation == UIImageOrientation.up {
+            return image
+        }
+        
+        UIGraphicsBeginImageContextWithOptions(image.size, false, image.scale)
+        let rect = CGRect(x: 0, y: 0, width: image.size.width, height: image.size.height)
+        image.draw(in: rect)
+        guard let normalizedImage: UIImage = UIGraphicsGetImageFromCurrentImageContext() else  {
+            return UIImage()
+        }
+        UIGraphicsEndImageContext()
+        return normalizedImage
+    }
+
 }
 
 extension ImagePickerButton: UINavigationControllerDelegate, UIImagePickerControllerDelegate {
@@ -203,12 +220,14 @@ extension ImagePickerButton: UINavigationControllerDelegate, UIImagePickerContro
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [String : Any]) {
         if let pickedImage = info[UIImagePickerControllerOriginalImage] as? UIImage {
             
-            guard let image = UIImageJPEGRepresentation(pickedImage, 1.0) else {
+            let imagePicked = fixOrientation(image: pickedImage)  // ---> Orientation fix from camera
+            
+            guard let image = UIImageJPEGRepresentation(imagePicked, 1.0) else {
                 return
             }
             
             if image.count > highResolutionSize { //high resolution check
-                if let data = UIImageJPEGRepresentation(pickedImage, 0.2) {
+                if let data = UIImageJPEGRepresentation(imagePicked, 0.2) {
                     do {
                         try data.write(to: URL(fileURLWithPath: filePath ?? "no Path"), options: .atomic)
                     } catch {
@@ -216,7 +235,7 @@ extension ImagePickerButton: UINavigationControllerDelegate, UIImagePickerContro
                     }
                 }
             } else {
-                if let data = UIImageJPEGRepresentation(pickedImage, 0.4) {
+                if let data = UIImageJPEGRepresentation(imagePicked, 0.4) {
                     do {
                         try data.write(to: URL(fileURLWithPath: filePath ?? "no Path"), options: .atomic)
                     } catch {
@@ -233,6 +252,14 @@ extension ImagePickerButton: UINavigationControllerDelegate, UIImagePickerContro
             if let imageCallBack =  self.imageCallBack {
                 imageCallBack(.error(.imageNotPicked))
             }
+        }
+        
+        picker.dismiss(animated: true, completion: nil)
+    }
+    
+    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+        if let imageCallBack =  self.imageCallBack {
+            imageCallBack(.error(.pickerCancelled))
         }
         
         picker.dismiss(animated: true, completion: nil)
