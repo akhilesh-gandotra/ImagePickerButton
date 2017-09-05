@@ -5,6 +5,7 @@
 //
 
 import UIKit
+import AVFoundation
 
 //MARK: Picker Enumrations
 enum PickerResult {
@@ -23,6 +24,7 @@ enum SelectImageError: LocalizedError {
     case photoLibrary
     case pickerCancelled
     case imageNotPicked
+    case deniedCameraPermission
     
     var errorDescription: String? {
         switch self {
@@ -34,6 +36,8 @@ enum SelectImageError: LocalizedError {
             return "Image picker cancelled".localized
         case .imageNotPicked:
             return "Could not pick image in the info".localized
+        case .deniedCameraPermission:
+            return "The app is not permitted to use camera.Please goto settings to give the required permissions".localized
         }
     }
 }
@@ -160,6 +164,9 @@ class ImagePickerButton: UIButton {
         let cameraAction = UIAlertAction(title: cameratitle.localized, style: .default, handler: {  (alert: UIAlertAction!) -> Void in
             if UIImagePickerController.isSourceTypeAvailable(UIImagePickerControllerSourceType.camera) {
                 
+                guard self.isCameraPermitted() else {
+                    return
+                }
                 self.picker?.sourceType = UIImagePickerControllerSourceType.camera
                 guard let rootViewController = UIApplication.shared.keyWindow?.rootViewController,
                     let picker = self.picker else {
@@ -211,6 +218,22 @@ class ImagePickerButton: UIButton {
         UIGraphicsEndImageContext()
         return normalizedImage
     }
+    
+    // MARK: For checking camera permissions
+    private func isCameraPermitted() -> Bool {
+        
+        let status = AVCaptureDevice.authorizationStatus(forMediaType: AVMediaTypeVideo)
+        switch status {
+        case .authorized:
+            return true
+        case .denied, .restricted:
+            self.imageCallBack?(.error(.deniedCameraPermission))
+            return true
+        default:
+            return true
+        }
+    }
+
 
 }
 
@@ -265,13 +288,7 @@ extension ImagePickerButton: UINavigationControllerDelegate, UIImagePickerContro
         picker.dismiss(animated: true, completion: nil)
     }
     
-    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-        if let imageCallBack =  self.imageCallBack {
-            imageCallBack(.error(.pickerCancelled))
-        }
-        
-        picker.dismiss(animated: true, completion: nil)
-    }
+
 }
 extension String {
     var localized: String {

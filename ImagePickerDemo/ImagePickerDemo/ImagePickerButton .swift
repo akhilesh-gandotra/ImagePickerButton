@@ -5,8 +5,9 @@
 //
 
 import UIKit
+import AVFoundation
 
-// MARK: Picker Enumrations
+//MARK: Picker Enumrations
 enum PickerResult {
     case success(String)
     case error(SelectImageError)
@@ -23,6 +24,7 @@ enum SelectImageError: LocalizedError {
     case photoLibrary
     case pickerCancelled
     case imageNotPicked
+    case deniedCameraPermission
     
     var errorDescription: String? {
         switch self {
@@ -34,11 +36,13 @@ enum SelectImageError: LocalizedError {
             return "Image picker cancelled".localized
         case .imageNotPicked:
             return "Could not pick image in the info".localized
+        case .deniedCameraPermission:
+            return "The app is not permitted to use camera.Please goto settings to give the required permissions".localized
         }
     }
 }
 
-// MARK: Class Image_Picker_Button
+//MARK: Class Image_Picker_Button
 class ImagePickerButton: UIButton {
     
     //MARK: Variables
@@ -52,7 +56,7 @@ class ImagePickerButton: UIButton {
     let highResolutionSize = 2048 // can change according to your app.
     
     
-    // MARK: Starting
+    //MARK: Starting
     override func awakeFromNib() {
         self.addTarget(self, action: #selector(ImagePickerButton.pressAction(_:)), for: UIControlEvents.touchUpInside)
     }
@@ -60,7 +64,7 @@ class ImagePickerButton: UIButton {
     deinit {
     }
     
-    // MARK: Customizables results for selecting file name, picker type and titles
+    //MARK: Customizables results for selecting file name, picker type and titles
     @discardableResult
     func customize(type: PickerType, fileName: String = "#fileName") -> ImagePickerButton {
         pickerType = type
@@ -79,7 +83,7 @@ class ImagePickerButton: UIButton {
     }
     
     
-    // MARK: Button Action
+    //MARK: Button Action
     @objc private func pressAction(_ sender: ImagePickerButton) {
         
         guard let pickerType = self.pickerType else {
@@ -88,7 +92,7 @@ class ImagePickerButton: UIButton {
         self.selectImage(fileName: fileName, pickerType: pickerType)
     }
     
-    // MARK: Document Directory Path
+    //MARK: Document Directory Path
     func pathToDocumentsDirectory() -> String {
         
         let documentsPath: AnyObject = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0] as AnyObject
@@ -160,6 +164,9 @@ class ImagePickerButton: UIButton {
         let cameraAction = UIAlertAction(title: cameratitle.localized, style: .default, handler: {  (alert: UIAlertAction!) -> Void in
             if UIImagePickerController.isSourceTypeAvailable(UIImagePickerControllerSourceType.camera) {
                 
+                guard self.isCameraPermitted() else {
+                    return
+                }
                 self.picker?.sourceType = UIImagePickerControllerSourceType.camera
                 guard let rootViewController = UIApplication.shared.keyWindow?.rootViewController,
                     let picker = self.picker else {
@@ -196,13 +203,12 @@ class ImagePickerButton: UIButton {
         actionSheet.addAction(photoLibraryAction)
     }
     
-    // MARK: for orientation errors
-     func fixOrientation(image: UIImage) -> UIImage {
-
+    func fixOrientation(image: UIImage) -> UIImage {
+        
         if image.imageOrientation == UIImageOrientation.up {
             return image
         }
-
+        
         UIGraphicsBeginImageContextWithOptions(image.size, false, image.scale)
         let rect = CGRect(x: 0, y: 0, width: image.size.width, height: image.size.height)
         image.draw(in: rect)
@@ -212,6 +218,23 @@ class ImagePickerButton: UIButton {
         UIGraphicsEndImageContext()
         return normalizedImage
     }
+    
+    // MARK: For checking camera permissions
+    private func isCameraPermitted() -> Bool {
+        
+        let status = AVCaptureDevice.authorizationStatus(forMediaType: AVMediaTypeVideo)
+        switch status {
+        case .authorized:
+            return true
+        case .denied, .restricted:
+            self.imageCallBack?(.error(.deniedCameraPermission))
+            return true
+        default:
+            return true
+        }
+    }
+
+
 }
 
 extension ImagePickerButton: UINavigationControllerDelegate, UIImagePickerControllerDelegate {
@@ -264,6 +287,8 @@ extension ImagePickerButton: UINavigationControllerDelegate, UIImagePickerContro
         
         picker.dismiss(animated: true, completion: nil)
     }
+    
+
 }
 extension String {
     var localized: String {
